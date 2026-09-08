@@ -60,7 +60,7 @@ RAG combines document retrieval with AI generation to create chatbots that answe
 
 ```bash
 # Clone the repository
-git clone https://github.com/cameronobriendev/rag-chatbot.git
+git clone <your-repo-url>
 cd rag-chatbot
 
 # Install dependencies
@@ -225,8 +225,13 @@ MIT License - feel free to use for your own projects!
 
 ## Author
 
-**Cameron O'Brien**
-[GitHub](https://github.com/cameronobriendev)
+**Prince Mehra**
+Made by me
+
+- [Portfolio](https://portfolio-ruddy-seven-7slackrg3a.vercel.app/)
+- [GitHub](https://github.com/jeorgeiiii)
+- [LinkedIn](https://www.linkedin.com/in/prince-mehra-b3322935a/)
+- [LeetCode](https://leetcode.com/u/PrinceMehra/)
 
 ---
 

@@ -12,13 +12,13 @@ export default function Home() {
     <main className="min-h-screen w-full">
       {/* Navigation Buttons */}
       <a
-        href="https://cameronobrien.dev"
+        href="https://portfolio-ruddy-seven-7slackrg3a.vercel.app/"
         className="nav-btn top-5 left-5 z-50 px-4 py-2 rounded-lg text-sm font-medium hidden md:inline-block"
       >
         Back to Portfolio
       </a>
       <a
-        href="https://github.com/cameronobriendev/rag-chatbot"
+        href="https://github.com/jeorgeiiii"
         className="nav-btn top-5 right-5 z-50 px-4 py-2 rounded-lg text-sm font-medium hidden md:inline-block"
       >
         View on GitHub
