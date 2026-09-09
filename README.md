@@ -1,238 +1,167 @@
 # RAG Chatbot
 
-A production-ready **Retrieval-Augmented Generation (RAG)** chatbot built with Next.js, PostgreSQL (pgvector), and OpenAI.
+A Retrieval-Augmented Generation chatbot: upload PDFs or text files, and ask questions that get answered from *those documents* — with source citations — instead of the model's training data.
 
-Upload documents and ask questions - the AI answers based on your custom knowledge base, not generic training data.
+Built to run entirely on free-tier services: **Neon** (Postgres + pgvector) for storage, **Groq** for chat generation, and **Gemini** for embeddings, since Groq doesn't offer an embeddings API of its own.
 
-## What is RAG?
+## How it works
 
-RAG combines document retrieval with AI generation to create chatbots that answer questions based on your specific documents. Instead of relying on the AI's training data:
+**Upload**
 
-1. **Store** your documents in a vector database
-2. **Retrieve** relevant chunks when you ask questions
-3. **Generate** accurate answers grounded in your actual data
+```
+PDF/TXT → extract text → chunk (500 tokens, 50-token overlap) → embed (Gemini, 768-dim) → store in Postgres
+```
 
-## Features
+**Query**
 
-- 📚 **Custom Knowledge Base** - Upload PDFs and text files
-- 🔍 **Vector Similarity Search** - Fast semantic search with pgvector
-- 🤖 **AI-Powered Responses** - GPT-4o generates contextual answers
-- 📊 **Document Management** - Track and manage uploaded documents
-- 🎨 **Modern UI** - Clean, responsive interface with Tailwind CSS
-- ⚡ **Fast Responses** - 3-5 second query time with concise answers
-- 🔒 **Secure** - Built with security best practices from day one
+```
+question → embed (Gemini) → pgvector cosine search (top 3 chunks, session-scoped) → Groq (openai/gpt-oss-120b) → answer + citations
+```
 
-## Tech Stack
+Every document is tagged with a `session_id` generated client-side, so concurrent visitors never see each other's uploads or chat history — there's no login. Sessions and their documents are cleaned up after 24 hours (`scripts/add-session-isolation.js` installs the cleanup function).
 
-- **Frontend**: Next.js 16 (App Router), React 19, Tailwind CSS
-- **Backend**: Node.js serverless functions
-- **Database**: PostgreSQL with pgvector extension (HNSW indexing)
-- **AI/ML**: OpenAI Embeddings API (text-embedding-3-small) + GPT-4o
-- **Text Processing**: pdf-parse for document extraction
+## Tech stack
 
-## How It Works
+| Layer | Choice |
+|---|---|
+| Framework | Next.js 16 (App Router), React 19 |
+| Database | Neon Postgres + `pgvector` (HNSW index, cosine distance) |
+| Chat model | Groq — `openai/gpt-oss-120b` |
+| Embeddings | Google Gemini — `gemini-embedding-001`, 768 dimensions |
+| PDF parsing | `pdf-parse` v2 (pdfjs-dist under the hood) |
+| Styling | Tailwind CSS |
+| CSRF | Double-submit cookie, `HttpOnly` + `SameSite=Strict` |
 
-### Document Upload & Indexing
-
-1. Extract text from uploaded PDFs/TXT files
-2. Split text into semantic chunks (500 tokens with 50-token overlap)
-3. Generate 1536-dimension embeddings via OpenAI
-4. Store chunks + embeddings in PostgreSQL with pgvector
-
-### RAG Query Flow
-
-1. User asks a question
-2. Generate embedding for the question
-3. Vector similarity search (cosine distance) finds top 3 relevant chunks
-4. Build prompt with retrieved context + user question
-5. GPT-4o generates concise answer (2-3 sentences)
-6. Return response with source citations
-
-## Getting Started
+## Getting started
 
 ### Prerequisites
 
 - Node.js 18+
-- PostgreSQL database with pgvector extension enabled
-- OpenAI API key
+- A [Neon](https://neon.tech) Postgres database (pgvector is supported out of the box)
+- A [Groq](https://console.groq.com/keys) API key
+- A [Gemini](https://aistudio.google.com/apikey) API key
 
-### Installation
+### Setup
 
 ```bash
-# Clone the repository
-git clone <your-repo-url>
+git clone git@github.com:jeorgeiiii/rag-with-openai.git
 cd rag-chatbot
-
-# Install dependencies
 npm install
 
-# Set up environment variables
 cp .env.local.example .env.local
-# Edit .env.local with your credentials
+# fill in DATABASE_URL, GROQ_API_KEY, GEMINI_API_KEY, SESSION_SECRET
 ```
 
-### Environment Variables
-
-Required variables in `.env.local`:
+Initialize the schema, then apply the session-isolation migration:
 
 ```bash
-# PostgreSQL with pgvector
-DATABASE_URL=postgresql://user:password@host/database?sslmode=require
-
-# OpenAI API
-OPENAI_API_KEY=sk-proj-...
-
-# Optional: Session secret for CSRF protection
-SESSION_SECRET=your-secret-here-min-32-chars
+npm run db:init
+node scripts/add-session-isolation.js
 ```
-
-### Database Setup
-
-Enable pgvector extension in your PostgreSQL database:
-
-```sql
-CREATE EXTENSION IF NOT EXISTS vector;
-```
-
-Run the schema migration to create required tables:
-- `documents` - Document metadata
-- `chunks` - Text chunks with embeddings
-- `query_history` - Query logs and performance metrics
-
-### Run Development Server
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to see the app.
+Open [http://localhost:3000](http://localhost:3000).
 
-## Project Structure
+### Environment variables
+
+| Variable | Required | Notes |
+|---|---|---|
+| `DATABASE_URL` | yes | Neon connection string; `lib/db.js` maps it to `POSTGRES_URL` for `@vercel/postgres` at runtime |
+| `GROQ_API_KEY` | yes | Chat completions |
+| `GEMINI_API_KEY` | yes | Embeddings only, via Gemini's OpenAI-compatible endpoint |
+| `SESSION_SECRET` | recommended | Random 32+ byte string (`openssl rand -base64 32`) |
+| `ENFORCE_CSRF` | no | Set to `false` to bypass CSRF checks locally; leave unset in production |
+| `NEXT_PUBLIC_UPLOAD_URL` | no | Point uploads at an external service instead of `/api/upload` (see [Known limitation](#known-limitation-upload-size-on-vercel) below) |
+
+## Project structure
 
 ```
 rag-chatbot/
 ├── app/
 │   ├── api/
-│   │   ├── chat/          # RAG query endpoint
-│   │   ├── documents/     # Document management
-│   │   └── csrf-token/    # CSRF protection
-│   ├── layout.js          # Root layout
-│   ├── page.js            # Chat interface
-│   └── globals.css        # Global styles
+│   │   ├── chat/            # POST — embed query, vector search, generate answer
+│   │   ├── upload/          # POST — extract, chunk, embed, store a document
+│   │   ├── documents/       # GET  — list uploaded documents
+│   │   ├── clear-session/   # POST — wipe a session's documents/chunks (cascades)
+│   │   └── csrf-token/      # GET  — issue a CSRF token + cookie
+│   ├── layout.js
+│   └── page.js
 ├── components/
-│   └── ChatInterface.js   # Main chat UI component
+│   ├── ChatInterface.js     # chat UI, upload flow, document list
+│   ├── ConfirmModal.js
+│   ├── WelcomeModal.js
+│   └── icons/                # inline SVG icon components
 ├── lib/
-│   ├── db.js             # Database connection
-│   └── embeddings.js     # OpenAI embedding utilities
-└── package.json
+│   ├── db.js                 # Neon connection (DATABASE_URL → POSTGRES_URL)
+│   ├── embeddings.js         # Gemini embeddings client
+│   ├── pdf-extractor.js      # pdf-parse wrapper
+│   ├── text-chunking.js      # sentence/paragraph-aware chunker
+│   ├── csrf.js                # token generation/verification
+│   └── csrf-middleware.js     # withCsrf() route wrapper
+└── scripts/
+    ├── init-db.js             # creates tables, HNSW index, document_stats view
+    └── add-session-isolation.js  # adds session_id + 24h cleanup function
 ```
 
-## Key Technical Features
+## API
 
-### Vector Search with pgvector
+All state-changing endpoints (`POST`) require an `X-CSRF-Token` header matching the `csrf_token` cookie from `GET /api/csrf-token`.
 
-Uses PostgreSQL's pgvector extension with HNSW indexing for fast approximate nearest neighbor search:
-
-```sql
-SELECT content, 1 - (embedding <=> query_embedding) as similarity
-FROM chunks
-ORDER BY embedding <=> query_embedding
-LIMIT 3
+**`POST /api/upload`**
+```json
+{ "fileData": "<base64>", "fileName": "doc.pdf", "fileType": "application/pdf", "sessionId": "..." }
+→ { "document": { "id": 1, "name": "doc.pdf", "chunkCount": 12 } }
 ```
 
-### Semantic Chunking
+**`POST /api/chat`**
+```json
+{ "query": "what does the doc say about X?", "sessionId": "..." }
+→ { "response": "...", "sources": [{ "documentName", "similarity", "preview" }], "metadata": { "retrievalTime", "generationTime" } }
+```
 
-Smart text splitting that:
-- Targets 500 tokens per chunk (2000 chars)
-- 50-token overlap between chunks (prevents context loss)
-- Breaks at natural boundaries (sentences, paragraphs)
-- Handles null bytes and special characters
+**`GET /api/documents`** → `{ "documents": [...] }`
 
-### Optimized for Speed
+**`POST /api/clear-session`**
+```json
+{ "sessionId": "..." }
+→ { "success": true, "deletedDocuments": 3 }
+```
 
-- 3 chunks retrieved (not 5) - 40% less context overhead
-- GPT-4o with 150 max tokens - fast, concise responses
-- Temperature 0.3 - focused answers, less rambling
-- Session isolation - users only see their own documents
+## Database schema
 
-## Cost Estimate
+- **`documents`** — `id`, `name`, `file_type`, `file_size`, `session_id`, `chunk_count`, `metadata`, timestamps
+- **`chunks`** — `id`, `document_id` (FK, `ON DELETE CASCADE`), `chunk_index`, `content`, `token_count`, `embedding vector(768)`
+- **`query_history`** — `query`, `response`, `retrieved_chunks`, timing columns (retrieval/generation/total ms)
+- Indexes: `idx_chunks_document_id`, `idx_chunks_embedding` (HNSW, `vector_cosine_ops`, `m=16, ef_construction=64`), `idx_documents_session_id`
 
-For portfolio/demo use (~100 queries/month):
-- **OpenAI Embeddings**: ~$2/month
-- **OpenAI GPT-4o**: ~$3-5/month
-- **Database**: Free tier available (Neon, Supabase)
-- **Hosting**: Free tier (Vercel, Netlify)
+## Security
 
-**Total**: $5-10/month for personal projects
+- CSRF: double-submit cookie pattern, constant-time comparison
+- Session isolation: every query/delete is scoped to `session_id`; no cross-session data access
+- Parameterized SQL throughout (tagged-template queries via `@vercel/postgres`, no string interpolation)
+- Null bytes stripped from extracted text before insert (Postgres `text` rejects them)
+- Generic error responses to clients; details logged server-side only
 
-For production (~1000 queries/month): ~$30-50/month
+## Known limitation: upload size on Vercel
+
+Vercel serverless functions cap request bodies at **4.5MB**, regardless of the app's own 25MB check. Base64-encoding a file inflates its size ~33%, so PDFs beyond roughly 3MB will fail to upload once deployed, even though they work fine locally. Set `NEXT_PUBLIC_UPLOAD_URL` to route uploads through an external service to work around this, or wire up `@vercel/blob` (already a dependency, not yet used) for direct client-side uploads.
 
 ## Deployment
 
-### Deploy to Vercel
-
 ```bash
-# Install Vercel CLI
 npm i -g vercel
-
-# Deploy
 vercel --prod
 ```
 
-Add environment variables in Vercel dashboard:
-- `DATABASE_URL`
-- `OPENAI_API_KEY`
-- `SESSION_SECRET`
-
-### Database Hosting Options
-
-- **Neon** - Serverless PostgreSQL with pgvector (free tier available)
-- **Supabase** - PostgreSQL with pgvector support
-- **DigitalOcean** - Managed PostgreSQL + self-hosted pgvector
-
-## Security Features
-
-- CSRF protection on all state-changing endpoints
-- Input validation and sanitization
-- Parameterized SQL queries (no SQL injection)
-- Session isolation (users can't access others' documents)
-- Environment variable protection (.gitignore blocks all .env files)
-- Generic error messages (no information leakage)
-
-## Use Cases
-
-- **Customer Support** - Answer questions from product documentation
-- **Research** - Query academic papers and research notes
-- **Legal/Compliance** - Search contracts and policy documents
-- **Education** - Study aids based on textbooks and lectures
-- **Personal Knowledge Management** - Your own AI assistant
-
-## Portfolio Project
-
-This RAG chatbot demonstrates:
-- **AI/ML Integration** - OpenAI embeddings + GPT-4o
-- **Vector Databases** - PostgreSQL pgvector with HNSW indexing
-- **Modern Web Stack** - Next.js 16, React 19, Tailwind CSS
-- **API Design** - RESTful endpoints for upload, query, document management
-- **Security Best Practices** - CSRF protection, input validation, session isolation
-- **Performance Optimization** - Fast queries, concise responses
-
-**Ideal for freelance work**: Custom RAG implementations typically bill at $100-150/hr.
+Set `DATABASE_URL`, `GROQ_API_KEY`, `GEMINI_API_KEY`, and `SESSION_SECRET` in the Vercel project's environment variables. If deploying against a fresh database, run `npm run db:init` and `node scripts/add-session-isolation.js` against it first.
 
 ## License
 
-MIT License - feel free to use for your own projects!
+MIT
 
 ## Author
 
-**Prince Mehra**
-Made by me
-
-- [Portfolio](https://portfolio-ruddy-seven-7slackrg3a.vercel.app/)
-- [GitHub](https://github.com/jeorgeiiii)
-- [LinkedIn](https://www.linkedin.com/in/prince-mehra-b3322935a/)
-- [LeetCode](https://leetcode.com/u/PrinceMehra/)
-
----
-
-Built with [Claude Code](https://claude.com/claude-code)
+**Prince Mehra** — [Portfolio](https://portfolio-ruddy-seven-7slackrg3a.vercel.app/) · [GitHub](https://github.com/jeorgeiiii) · [LinkedIn](https://www.linkedin.com/in/prince-mehra-b3322935a/)
