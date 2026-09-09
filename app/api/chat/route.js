@@ -2,8 +2,9 @@ import { getDB } from '../../../lib/db.js';
 import { generateEmbedding } from '../../../lib/embeddings.js';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+const groq = new OpenAI({
+  apiKey: process.env.GROQ_API_KEY,
+  baseURL: 'https://api.groq.com/openai/v1'
 });
 
 /**
@@ -100,8 +101,8 @@ export async function POST(req) {
 
     console.log('[Chat] Context built from', results.length, 'chunks');
 
-    // Step 4: Generate response using GPT-4
-    console.log('[Chat] Generating response with GPT-4...');
+    // Step 4: Generate response using Groq
+    console.log('[Chat] Generating response with Groq...');
     const generationStart = Date.now();
 
     const systemPrompt = `You are a concise AI assistant that answers questions based on the provided context.
@@ -119,8 +120,8 @@ Question: ${query}
 
 Answer briefly (2-3 sentences) based on the context above. Cite sources using [1], [2], etc.`;
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',  // GPT-4 Omni: faster, cheaper, 128k context window
+    const completion = await groq.chat.completions.create({
+      model: 'openai/gpt-oss-120b',  // Groq-hosted, fast + free-tier friendly
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }

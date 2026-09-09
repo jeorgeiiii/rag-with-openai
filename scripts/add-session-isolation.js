@@ -4,6 +4,11 @@ import dotenv from 'dotenv';
 // Load .env.local file
 dotenv.config({ path: '.env.local' });
 
+// @vercel/postgres expects POSTGRES_URL, but Neon provides DATABASE_URL
+if (!process.env.POSTGRES_URL && process.env.DATABASE_URL) {
+  process.env.POSTGRES_URL = process.env.DATABASE_URL;
+}
+
 /**
  * Add session-based isolation to RAG chatbot
  *

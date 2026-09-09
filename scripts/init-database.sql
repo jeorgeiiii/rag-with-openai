@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS chunks (
   chunk_index INTEGER NOT NULL, -- Order within document
   content TEXT NOT NULL, -- The actual text chunk
   token_count INTEGER, -- Number of tokens in chunk
-  embedding vector(1536), -- OpenAI embedding (text-embedding-3-small = 1536 dimensions)
+  embedding vector(768), -- Groq embedding (nomic-embed-text-v1_5 = 768 dimensions)
   metadata JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMP DEFAULT NOW()
 );

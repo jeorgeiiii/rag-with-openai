@@ -32,7 +32,7 @@ export default function Home() {
               RAG Chatbot
             </h1>
             <p className="opacity-90">
-              Retrieval-Augmented Generation with pgvector + OpenAI
+              Retrieval-Augmented Generation with pgvector + Groq + Gemini
             </p>
           </div>
 
@@ -64,7 +64,7 @@ export default function Home() {
                 <SmartToy className="w-5 h-5" /> AI Responses
               </h3>
               <p className="text-sm opacity-80">
-                GPT-4 generates answers based on your data
+                Groq-hosted LLM generates answers based on your data
               </p>
             </div>
           </div>
@@ -92,7 +92,7 @@ export default function Home() {
                   </li>
                   <li className="flex items-start">
                     <span className="mr-2">•</span>
-                    <span><strong>OpenAI Embeddings</strong> - text-embedding-3-small (1536 dimensions)</span>
+                    <span><strong>Gemini Embeddings</strong> - gemini-embedding-001 (768 dimensions)</span>
                   </li>
                   <li className="flex items-start">
                     <span className="mr-2">•</span>

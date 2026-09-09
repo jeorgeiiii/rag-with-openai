@@ -7,6 +7,11 @@ import dotenv from 'dotenv';
 // Load .env.local file
 dotenv.config({ path: '.env.local' });
 
+// @vercel/postgres expects POSTGRES_URL, but Neon provides DATABASE_URL
+if (!process.env.POSTGRES_URL && process.env.DATABASE_URL) {
+  process.env.POSTGRES_URL = process.env.DATABASE_URL;
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -46,7 +51,7 @@ async function initDatabase() {
         chunk_index INTEGER NOT NULL,
         content TEXT NOT NULL,
         token_count INTEGER,
-        embedding vector(1536),
+        embedding vector(768),
         metadata JSONB DEFAULT '{}'::jsonb,
         created_at TIMESTAMP DEFAULT NOW()
       )
