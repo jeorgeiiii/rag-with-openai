@@ -50,3 +50,5 @@ next-env.d.ts
 
 # EXCEPT README.md (public-facing documentation)
 !README.md
+
+.vercel
