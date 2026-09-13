@@ -45,7 +45,7 @@ export default function ChatInterface() {
 
   async function fetchDocuments() {
     try {
-      const res = await fetch('/api/documents');
+      const res = await fetch(`/api/documents?sessionId=${encodeURIComponent(sessionId)}`);
       const data = await res.json();
       setDocuments(data.documents || []);
     } catch (error) {

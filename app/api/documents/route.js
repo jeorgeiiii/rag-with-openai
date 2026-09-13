@@ -7,6 +7,16 @@ import { getDB } from '../../../lib/db.js';
  */
 export async function GET(req) {
   try {
+    const { searchParams } = new URL(req.url);
+    const sessionId = searchParams.get('sessionId');
+
+    if (!sessionId) {
+      return new Response(
+        JSON.stringify({ error: 'sessionId is required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     const db = getDB();
 
     const documentsResult = await db`
@@ -19,6 +29,7 @@ export async function GET(req) {
         upload_date,
         metadata
       FROM documents
+      WHERE session_id = ${sessionId}
       ORDER BY upload_date DESC
     `;
 
