@@ -23,6 +23,12 @@ export default function Home() {
       >
         View on GitHub
       </a>
+      <a
+        href="/office"
+        className="nav-btn bottom-5 right-5 z-50 px-4 py-2 rounded-lg text-sm font-medium hidden md:inline-block"
+      >
+        Office Assistant
+      </a>
 
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-5xl mx-auto w-full">
