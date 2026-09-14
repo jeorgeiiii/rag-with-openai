@@ -26,6 +26,15 @@ const ALL_TOOL_IMPL = { ...EXCEL_TOOL_IMPL, ...WORD_TOOL_IMPL, ...PPTX_TOOL_IMPL
  */
 async function handler(req) {
   try {
+    if (process.platform !== 'win32') {
+      return new Response(
+        JSON.stringify({
+          error: 'The Office Assistant requires Windows with Microsoft Office installed. It only runs when this app is started locally (npm run dev / npm start) on that machine - it is not available on this deployment.'
+        }),
+        { status: 501, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { message, history } = await req.json();
 
     if (!message || !message.trim()) {
